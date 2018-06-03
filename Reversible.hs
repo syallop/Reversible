@@ -36,7 +36,7 @@ module Reversible
   , required
   , prefered
 
-  , Reversible
+  , Reversible (..)
   , reversible
   )
   where
