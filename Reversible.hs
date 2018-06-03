@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, KindSignatures, TypeOperators, FlexibleContexts, RankNTypes, ScopedTypeVariables #-}
 {-|
 Module      : Reversible
 Copyright   : (c) Samuel A. Yallop, 2018
@@ -14,7 +14,7 @@ prevent round-trip properties from being accidentally violated as definitions
 are changed.
 -}
 module Reversible
-  ( Reversible (..)
+  ( ReversibleInstr (..)
 
   , rpure
   , rempty
@@ -35,6 +35,9 @@ module Reversible
   , allowed
   , required
   , prefered
+
+  , Reversible
+  , reversible
   )
   where
 
@@ -47,31 +50,34 @@ import Data.Foldable
 import Data.Monoid
 import Reversible.Iso
 
--- | A 'Reversible' is a computation with some result type 'a' supporting:
+import DSL.Instruction
+
+-- | A 'ReversibleInstr' is a computation with some result type 'a' supporting:
 -- - Injecting of pure values via 'RPure'.
 -- - Applying reversible 'Iso' functions via 'RMap'.
 -- - Alternatives and failure via 'REmpty' and 'RAlt'.
 -- - Sequential application via 'RAp'.
-data Reversible a where
-  -- | RPure is similar to 'Applicative' 'pure' - it injects a value typed 'a'
+-- - You may inject your own instruction type 'i'.
+data ReversibleInstr (i :: (* -> *) -> * -> *) (p :: * -> *) (a :: *) where
+  -- | RPure is similar to 'Applicative' 'pure' - it reversibles a value typed 'a'
   -- into the 'Reversible' context.
   -- Unlike Applicative, we must be able to compare the value for equality to
   -- permit reversal.
   RPure
     :: Eq a
     => a
-    -> Reversible a
+    -> ReversibleInstr i p a
 
   -- | REmpty is similar to 'Alternative's 'empty' - it encodes a notion of
   -- failure.
   REmpty
-    :: Reversible a
+    :: ReversibleInstr i p a
 
   -- | RAlt is similar to 'Alternative's '<|>' - it encodes a notion of choice.
   RAlt
-    :: Reversible a
-    -> Reversible a
-    -> Reversible a
+    :: p a
+    -> p a
+    -> ReversibleInstr i p a
 
   -- | RMap is similar to 'Functor's 'fmap' - it allows mapping a function over
   -- something in the 'Reversible' context.
@@ -80,8 +86,8 @@ data Reversible a where
   RMap
     :: Show a
     => Iso a b
-    -> Reversible a
-    -> Reversible b
+    -> p a
+    -> ReversibleInstr i p b
 
   -- | RAp is similar to 'Applicative's '<*>' or 'Monad's 'ap' - it encodes a
   -- notion of sequential application.
@@ -89,43 +95,57 @@ data Reversible a where
   -- function to permit reversal.
   RAp
     :: (Show a, Show b)
-    => Reversible a
-    -> Reversible b
-    -> Reversible (a,b)
+    => p a
+    -> p b
+    -> ReversibleInstr i p (a,b)
 
--- | rpure is similar to 'Applicative' 'pure' - it injects a value typed 'a'
+  ReversibleInstr
+    :: i p a
+    -> ReversibleInstr i p a
+
+newtype Reversible i a = Reversible (ReversibleInstr i (Reversible i) a)
+
+-- | Assert an instruction type is reversible.
+reversible
+  :: i :<- i'
+  => i (Reversible i') a
+  -> Reversible i' a
+reversible = Reversible . ReversibleInstr . inj
+
+-- | rpure is similar to 'Applicative' 'pure' - it reversibles a value typed 'a'
 -- into the 'Reversible' context.
 -- Unlike Applicative, we must be able to compare the value for equality to
 -- permit reversal.
 rpure
   :: Eq a
   => a
-  -> Reversible a
-rpure = RPure
+  -> Reversible i a
+rpure = Reversible . RPure
 
 -- | rempty is similar to 'Alternative's 'empty' - it encodes a notion of
 -- failure.
 rempty
-  :: Reversible a
-rempty = REmpty
+  :: Reversible i a
+rempty = Reversible REmpty
 
 -- | ralt is similar to 'Alternative's '<|>' - it encodes a notion of choice.
 ralt
-  :: Reversible a
-  -> Reversible a
-  -> Reversible a
-ralt = RAlt
+  :: Reversible i a
+  -> Reversible i a
+  -> Reversible i a
+ralt l r = Reversible $ RAlt l r
 
 -- | rmap is similar to 'Functor's 'fmap' - it allows mapping a function over
 -- something in the 'Reversible' context.
 -- Unlike fmap which takes a plain function, rmap accepts an 'Iso' to permit
 -- reversal.
 rmap
-  :: Show a
+  :: ( Show a
+     )
   => Iso a b
-  -> Reversible a
-  -> Reversible b
-rmap = RMap
+  -> Reversible i a
+  -> Reversible i b
+rmap iso p = Reversible $ RMap iso p
 
 -- | rap is similar to 'Applicative's '<*>' or 'Monad's 'ap' - it encodes a
 -- notion of sequential application.
@@ -135,10 +155,10 @@ rap
   :: ( Show a
      , Show b
      )
-  => Reversible a
-  -> Reversible b
-  -> Reversible (a,b)
-rap = RAp
+  => Reversible i a
+  -> Reversible i b
+  -> Reversible i (a,b)
+rap l r = Reversible $ RAp l r
 
 infixl 3 \|/
 infixr 6 \*/
@@ -146,9 +166,9 @@ infix  5 \$/
 
 -- | Infix 'ralt'.
 (\|/)
-  :: Reversible a
-  -> Reversible a
-  -> Reversible a
+  :: Reversible i a
+  -> Reversible i a
+  -> Reversible i a
 (\|/) = ralt
 
 -- | Infix 'rap'.
@@ -156,9 +176,9 @@ infix  5 \$/
   :: ( Show a
      , Show b
      )
-  => Reversible a
-  -> Reversible b
-  -> Reversible (a,b)
+  => Reversible i a
+  -> Reversible i b
+  -> Reversible i (a,b)
 (\*/) = rap
 
 -- | Infix 'rmap'.
@@ -167,8 +187,8 @@ infix  5 \$/
      , Show b
      )
   => Iso a b
-  -> Reversible a
-  -> Reversible b
+  -> Reversible i a
+  -> Reversible i b
 (\$/) = rmap
 
 -- | Execute a 'Reversible' with a discardable result, then sequentially execute
@@ -176,10 +196,11 @@ infix  5 \$/
 -- Similar to 'Applicative's *>' except the discarded computation must return
 -- '()'.
 (*/)
-  :: Show a
-  => Reversible ()
-  -> Reversible a
-  -> Reversible a
+  :: ( Show a
+     )
+  => Reversible i ()
+  -> Reversible i a
+  -> Reversible i a
 rl */ rr = inverse unitIso . flipIso \$/ rl \*/ rr
 
 -- | Execute a 'Reversible' with a result to return, then sequentially execute
@@ -187,25 +208,27 @@ rl */ rr = inverse unitIso . flipIso \$/ rl \*/ rr
 -- Similar to 'Applicative's <*' except the discarded computation must return
 -- '()'.
 (\*)
-  :: Show a
-  => Reversible a
-  -> Reversible ()
-  -> Reversible a
+  :: ( Show a
+     )
+  => Reversible i a
+  -> Reversible i ()
+  -> Reversible i a
 rl \* rr = inverse unitIso \$/ rl \*/ rr
 
 -- | A 'Reversible' function between two others.
 between
-  :: Show a
-  => Reversible ()
-  -> Reversible a
-  -> Reversible ()
-  -> Reversible a
+  :: ( Show a
+     )
+  => Reversible i ()
+  -> Reversible i a
+  -> Reversible i ()
+  -> Reversible i a
 between l a r = l */ a \* r
 
 -- | A list of alternative Reversibles.
 alternatives
-  :: [Reversible a]
-  -> Reversible a
+  :: [Reversible i a]
+  -> Reversible i a
 alternatives = foldr ralt rempty
 
 -- | Zero or many reversible functions.
@@ -213,8 +236,8 @@ rmany
   :: ( Eq a
      , Show a
      )
-  => Reversible a
-  -> Reversible [a]
+  => Reversible i a
+  -> Reversible i [a]
 rmany g = rmany1 g \|/ rpure []
 
 -- | One or many reversible functions.
@@ -222,28 +245,28 @@ rmany1
   :: ( Eq a
      , Show a
      )
-  => Reversible a
-  -> Reversible [a]
+  => Reversible i a
+  -> Reversible i [a]
 rmany1 g = consIso \$/ g \*/ rmany g
 
 -- | A reversible computation is allowed to succeed when ran forwards but
 -- ignored backwards.
 allowed
-  :: Reversible ()
-  -> Reversible ()
+  :: Reversible i ()
+  -> Reversible i ()
 allowed g = ignoreIso [] \$/ rmany g
 
 -- | A reversible computation is required to succeed when ran forwards and runs
 -- backwards.
 required
-  :: Reversible ()
-  -> Reversible ()
+  :: Reversible i ()
+  -> Reversible i ()
 required g = g \* allowed g
 
 -- | A reversible computation is allowed to succeed when ran forwards, and runs
 -- backwards.
 prefered
-  :: Reversible ()
-  -> Reversible ()
+  :: Reversible i ()
+  -> Reversible i ()
 prefered g = ignoreIso [()] \$/ rmany g
 
