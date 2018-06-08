@@ -140,8 +140,7 @@ ralt l r = Reversible $ RAlt l r
 -- Unlike fmap which takes a plain function, rmap accepts an 'Iso' to permit
 -- reversal.
 rmap
-  :: ( Show a
-     )
+  :: Show a
   => Iso a b
   -> Reversible i a
   -> Reversible i b
@@ -196,8 +195,7 @@ infix  5 \$/
 -- Similar to 'Applicative's *>' except the discarded computation must return
 -- '()'.
 (*/)
-  :: ( Show a
-     )
+  :: Show a
   => Reversible i ()
   -> Reversible i a
   -> Reversible i a
@@ -208,8 +206,7 @@ rl */ rr = inverse unitIso . flipIso \$/ rl \*/ rr
 -- Similar to 'Applicative's <*' except the discarded computation must return
 -- '()'.
 (\*)
-  :: ( Show a
-     )
+  :: Show a
   => Reversible i a
   -> Reversible i ()
   -> Reversible i a
@@ -217,8 +214,7 @@ rl \* rr = inverse unitIso \$/ rl \*/ rr
 
 -- | A 'Reversible' function between two others.
 between
-  :: ( Show a
-     )
+  :: Show a
   => Reversible i ()
   -> Reversible i a
   -> Reversible i ()
