@@ -225,6 +225,39 @@ between
   -> Reversible i a
 between l a r = l */ a \* r
 
+-- | A 'Reversible' function which may occur between many matching pairs of some
+-- other 'Reversible's.
+--
+-- E.G.
+--
+-- betweenMany "(" r ")" is either:
+-- - r
+-- - (r)
+-- - ((r))
+-- but never:
+-- - (r
+-- - ((r)
+-- - (((r
+-- as the between reversibles do not match.
+betweenMany
+  :: Show a
+  => Reversible i ()
+  -> Reversible i a
+  -> Reversible i ()
+  -> Reversible i a
+betweenMany l a r =
+  a \|/ (l */ (between l a r) \* r)
+
+-- | 'betweenMany' where the 'reversible' must occur with atleast one matching
+-- pair of some other 'Reversibles'.
+betweenMany1
+  :: Show a
+  => Reversible i ()
+  -> Reversible i a
+  -> Reversible i ()
+  -> Reversible i a
+betweenMany1 l a r = l */ betweenMany l a r \* r
+
 -- | A list of alternative Reversibles.
 alternatives
   :: [Reversible i a]
