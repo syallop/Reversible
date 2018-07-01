@@ -29,6 +29,8 @@ module Reversible
   , (\*)
 
   , between
+  , betweenMany
+  , betweenMany1
   , alternatives
   , rmany
   , rmany1
