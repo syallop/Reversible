@@ -36,7 +36,7 @@ module Reversible
   , rmany1
   , allowed
   , required
-  , prefered
+  , preferred
 
   , Reversible (..)
   , reversible
@@ -296,8 +296,8 @@ required g = g \* allowed g
 
 -- | A reversible computation is allowed to succeed when ran forwards, and runs
 -- backwards.
-prefered
+preferred
   :: Reversible i ()
   -> Reversible i ()
-prefered g = ignoreIso [()] \$/ rmany g
+preferred g = ignoreIso [()] \$/ rmany g
 
