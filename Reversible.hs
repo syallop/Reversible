@@ -45,11 +45,7 @@ module Reversible
 
 import Prelude hiding ((.),id)
 
-import Control.Applicative
 import Control.Category
-import Control.Monad
-import Data.Foldable
-import Data.Monoid
 import Reversible.Iso
 
 import DSL.Instruction

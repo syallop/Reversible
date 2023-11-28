@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 {-|
 Module      : Reversible.Iso
 Copyright   : (c) Samuel A. Yallop, 2018
@@ -30,7 +31,6 @@ import Prelude hiding ((.),id)
 
 import Control.Category
 import Control.Monad
-import Data.Monoid
 
 -- | An Iso converts both ways between 'a' and 'b', each with an opportunity for
 -- failure in each direction.
@@ -62,7 +62,7 @@ backwards = _backwards
 inverse
   :: Iso a b
   -> Iso b a
-inverse (Iso forwards backwards) = Iso backwards forwards
+inverse (Iso f b) = Iso b f
 
 -- | Compose two 'Iso's.
 compose
@@ -84,9 +84,9 @@ nilIso
   :: Iso () [a]
 nilIso = Iso
   (\() -> Just [])
-  (\xs -> case xs of
+  (\case
     []     -> Just ()
-    (x:xs) -> Nothing
+    (_:_) -> Nothing
   )
 
 -- | The cons ':' case of a list.
@@ -95,7 +95,7 @@ consIso
   :: Iso (a,[a]) [a]
 consIso = Iso
   (\(x,xs) -> Just (x:xs))
-  (\xs -> case xs of
+  (\case
     []     -> Nothing
     (x:xs) -> Just (x,xs)
   )

@@ -17,3 +17,4 @@ library
                        DSL-Compose
   default-language:    Haskell2010
 
+  ghc-options: -Wall
