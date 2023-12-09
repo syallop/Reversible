@@ -47,6 +47,7 @@ import Prelude hiding ((.),id)
 
 import Control.Category
 import Reversible.Iso
+import Data.Kind
 
 import DSL.Instruction
 
@@ -56,7 +57,7 @@ import DSL.Instruction
 -- - Alternatives and failure via 'REmpty' and 'RAlt'.
 -- - Sequential application via 'RAp'.
 -- - You may inject your own instruction type 'i'.
-data ReversibleInstr (i :: (* -> *) -> * -> *) (p :: * -> *) (a :: *) where
+data ReversibleInstr (i :: (Type -> Type) -> Type -> Type) (p :: Type -> Type) (a :: Type) where
   -- | RPure is similar to 'Applicative' 'pure' - it reversibles a value typed 'a'
   -- into the 'Reversible' context.
   -- Unlike Applicative, we must be able to compare the value for equality to
